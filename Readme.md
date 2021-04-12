@@ -62,7 +62,7 @@ Obviously you have to change email and domains to your settings.
 ### 4. Pull images
     docker pull nginx:stable-alpine
     docker pull mysql:5.7
-    docker pull mantenpanther/foodcoopshop:3.1.0
+    docker pull mantenpanther/foodcoopshop:3.2.2
 
 #### 4.1 Using your own FoocCoopShop image
 Modify the Dockerfile in the _application_ folder to your liking and create a new image, for example
@@ -150,7 +150,7 @@ The application relies on a few manual file-changes during setup. To keep the co
     -v /home/foodcoopshop/config/app/custom_config.php:/var/www/foodcoopshop/config/custom_config.php \
     -p 80:80 \
     --network=fcs-testnet \
-    -d mantenpanther/foodcoopshop:3.1.0
+    -d mantenpanther/foodcoopshop:3.2.2
 
 Following files need to be customized:
 - vhost for Apache conf (eventually, maybe the default-file is good enough)
