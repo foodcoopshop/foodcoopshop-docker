@@ -1,5 +1,5 @@
 # Example build
-docker build -t mantenpanther/foodcoopshop:3.2.0 .
+docker build -t mantenpanther/foodcoopshop:3.2.2 .
 
 # Create Net
 docker network create -d bridge fcs-testnet
@@ -24,4 +24,4 @@ docker run --name fcs-app \
 -v $FCS_CONFIG_PATH/config/app/custom_config.php:/var/www/foodcoopshop/config/custom_config.php \
 -p 80:80 \
 --network=fcs-testnet \
--d mantenpanther/foodcoopshop:3.2.0
+-d mantenpanther/foodcoopshop:3.2.2

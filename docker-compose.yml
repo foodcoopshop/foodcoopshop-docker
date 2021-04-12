@@ -6,7 +6,7 @@ networks:
 
 services:
   fcs-app:
-    image: mantenpanther/foodcoopshop:3.2.0
+    image: mantenpanther/foodcoopshop:3.2.2
     #restart: 'always'
     depends_on:
       - fcs-mysql

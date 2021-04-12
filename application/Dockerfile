@@ -1,6 +1,6 @@
 FROM ubuntu:18.04
 ENV DEBIAN_FRONTEND=noninteractive
-ENV FCS_VERSION="v3.2.0"
+ENV FCS_VERSION="v3.2.2"
 ENV PHP_VERSION="7.4"
 ENV FCS_SITE_CONF_NAME="010-foodcoopshop.conf"
 
