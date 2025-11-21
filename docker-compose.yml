@@ -1,0 +1,152 @@
+services:
+  foodcoopshop-nginx:
+    image: nginx:alpine
+    container_name: foodcoopshop-nginx
+    restart: always
+    volumes:
+      - ./config/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./fcs_data/webroot_files:/app/webroot/files:ro #Allows to serve public static files
+      - appdata:/app:ro #Mount FCS code (read-only) to serve static files
+    networks:
+      - proxy
+    depends_on:
+      - foodcoopshop-app
+    healthcheck:
+      test: ["CMD", "pgrep", "nginx"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  foodcoopshop-app:
+    build:
+      context: .
+      dockerfile: Dockerfile-app
+    image: foodcoopshop:latest #Always use latest version of our custom image
+    container_name: foodcoopshop-app
+    restart: always
+    environment:
+      - DB_HOST=YOURDBHOST
+      - DB_NAME=YOURDB
+      - DB_USER=YOURDBUSER
+      - DB_PASSWORD_FILE=/run/secrets/mysql_fcsdbpass
+      - APP_ENV=production
+    volumes:
+      - ./config/custom_config.php:/app/config/custom_config.php:ro
+      - ./config/credentials.php:/app/config/credentials.php:ro
+      - ./fcs_data/webroot_files:/app/webroot/files #Contains uploads from users like product images
+      - ./fcs_data/files_private:/app/files_private #Contains order lists, invoices and profile pictures
+      - appdata:/app #Mirrors FCS code into named volume
+    networks:
+      - proxy
+    secrets:
+      - mysql_fcsdbpass
+      - cakephp_salt
+      - cakephp_cookiekey
+      - email_pass
+    depends_on:
+      - foodcoopshop-db
+    healthcheck:
+      test: ["CMD", "pgrep", "php-fpm"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+  foodcoopshop-db:
+    image: mysql:lts
+    container_name: foodcoopshop-db
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD_FILE: /run/secrets/mysql_rootpass
+      MYSQL_DATABASE: YOURDB
+      MYSQL_USER: YOURDBUSER
+      MYSQL_PASSWORD_FILE: /run/secrets/mysql_fcsdbpass
+    volumes:
+      - mysql_data:/var/lib/mysql
+    networks:
+      - proxy
+    secrets:
+      - mysql_rootpass
+      - mysql_fcsdbpass
+    healthcheck:
+      test: ["CMD-SHELL", "mysql -h localhost -uroot -p$(cat /run/secrets/mysql_rootpass) -e 'SELECT 1' >/dev/null 2>&1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+  foodcoopshop-cron: #Following https://foodcoopshop.github.io/dev/cronjobs
+    image: foodcoopshop:latest #Uses same image than app container as CakePHP is used (simply restart this when app image is build)
+    container_name: foodcoopshop-cron
+    restart: always
+    volumes:
+      - ./config/custom_config.php:/app/config/custom_config.php:ro
+      - ./config/credentials.php:/app/config/credentials.php:ro
+      - ./fcs_data/webroot_files:/app/webroot/files
+      - ./fcs_data/files_private:/app/files_private
+      - ./entrypoints/foodcoopshop-cron.sh:/usr/local/bin/foodcoopshop-cron.sh:ro
+      - appdata:/app:ro #FCS code is required (e.g. CakePHP binary) 
+    networks:
+      - proxy
+    secrets:
+      - mysql_fcsdbpass
+      - cakephp_salt
+      - cakephp_cookiekey
+      - email_pass
+    depends_on:
+      - foodcoopshop-db
+      - foodcoopshop-app
+    entrypoint: ["/usr/local/bin/foodcoopshop-cron.sh"] #Overwrite entrypoint definition from Dockerfile.prod (take care making it executable -> chmod +x)
+    healthcheck:
+      test: ["CMD", "pgrep", "cron"]
+      interval: 1m
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  foodcoopshop-backup:
+    build:
+      context: . #Default value
+      dockerfile: Dockerfile-backup #Docker file to build with (via docker compose -f docker-compose.yml build foodcoopshop-backup)
+    image: foodcoopshop-backup
+    container_name: foodcoopshop-backup
+    restart: always
+    depends_on:
+      - foodcoopshop-db #without running db container no backup
+    volumes:
+      - /var/backups/foodcoopshop-backup:/backups #Local backups of FoodCoopShop are stored besides Nextcloud backups
+      - ./fcs_data/webroot_files:/app/webroot/files:ro
+#      - ./fcs_data/webroot_files:/app/webroot/files #Only required for restore
+      - ./fcs_data/files_private:/app/files_private:ro
+#      - ./fcs_data/files_private:/app/files_private #Only required for restore
+    networks:
+      - proxy
+    secrets:
+      - mysql_fcsdbpass
+    healthcheck:
+      test: ["CMD", "pgrep", "cron"]
+      interval: 1m
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+volumes:
+  mysql_data:
+  appdata: #Volume for sharing FCS src between app, nginx and cron service
+
+networks:
+  proxy:
+    external: true
+
+secrets:
+  mysql_rootpass:
+    file: ./secrets/mysql_rootpass.txt
+  mysql_fcsdbpass:
+    file: ./secrets/mysql_fcsdbpass.txt
+  cakephp_salt:
+    file: ./secrets/cakephp_salt.txt
+  cakephp_cookiekey:
+    file: ./secrets/cakephp_cookiekey.txt
+  email_pass:
+    file: ./secrets/email_pass.txt

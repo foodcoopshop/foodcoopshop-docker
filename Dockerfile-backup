@@ -1,0 +1,20 @@
+# Dockerfile for foodcoopshop-backup service
+## Use via 
+##  docker compose -f docker-compose.yml up -d --build foodcoopshop-backup
+## Or alternatively more clean
+##  docker compose -f docker-compose.yml build --no-cache foodcoopshop-backup
+##  docker compose -f docker-compose.yml up -d foodcoopshop-backup
+
+FROM debian:bookworm-slim
+
+# Install system dependencies for backup task 
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends cron mariadb-client zstd tzdata ca-certificates procps \
+    && rm -rf /var/lib/apt/lists/*
+
+# Entrypoint, backup and restore scripts
+COPY backup-script.sh /backup-script.sh
+COPY restore-script.sh /restore-script.sh
+COPY entrypoints/foodcoopshop-backup.sh /usr/local/bin/foodcoopshop-backup-entrypoint.sh
+RUN chmod +x /backup-script.sh /restore-script.sh /usr/local/bin/foodcoopshop-backup-entrypoint.sh
+ENTRYPOINT ["/usr/local/bin/foodcoopshop-backup-entrypoint.sh"]

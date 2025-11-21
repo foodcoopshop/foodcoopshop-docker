@@ -1,0 +1,62 @@
+# ------
+# Dockerfile for the FoodCoopShop application
+#   Utilizes Alpine Linux image with PHP and FPM onboard
+#   Built image is also used by the foodcoopshop-cron service
+#
+# Invoke this via
+#   docker compose -f foodcoopshop/docker-compose.yml build [--no-cache] --build-arg FCS_VERSION=<VERSION_NUMBER> foodcoopshop-app
+# or
+#   docker compose -f foodcoopshop/docker-compose.yml build [--no-cache] foodcoopshop-backup
+# ------
+FROM php:8.4-fpm-alpine
+# System dependencies fuer PHP
+RUN apk add --no-cache \
+    icu-libs icu-data-full libzip freetype libjpeg-turbo libpng bash unzip wget imagemagick bzip2 \
+    icu-dev libzip-dev libpng-dev libjpeg-turbo-dev freetype-dev imagemagick-dev autoconf make gcc g++ libtool \
+  && docker-php-ext-configure gd --with-freetype --with-jpeg \
+  && docker-php-ext-install -j$(nproc) intl zip pdo_mysql gd bz2 \
+  && pecl install imagick \
+  && docker-php-ext-enable imagick \
+  && apk del icu-dev libzip-dev libpng-dev libjpeg-turbo-dev freetype-dev imagemagick-dev autoconf make gcc g++ libtool
+# Create non-root user 'application'
+RUN addgroup -g 1000 application && adduser -D -u 1000 -G application application
+# Working dir for source code in the image
+WORKDIR /usr/src/app
+# Define version as build parameter
+ARG FCS_VERSION=4.1.1
+ENV FCS_VERSION=${FCS_VERSION}
+# Download release archive based on provided version number
+RUN wget -O /tmp/fcs-release.zip \
+      https://github.com/foodcoopshop/foodcoopshop/releases/download/v${FCS_VERSION}/FoodCoopShop-v${FCS_VERSION}.zip \
+    && unzip /tmp/fcs-release.zip -d /usr/src/app \
+    && mv /usr/src/app/foodcoopshop/* /usr/src/app/ \
+    && rm -rf /tmp/fcs-release.zip /usr/src/app/foodcoopshop
+# Ensure correct ownership
+RUN chown -R application:application /usr/src/app \
+    # Default permission: read-only
+    && find /usr/src/app -type f -exec chmod 644 {} + \
+    && find /usr/src/app -type d -exec chmod 755 {} + \
+    # Write permissions for dedicated dirs
+    && mkdir -p /usr/src/app/tmp /usr/src/app/logs /usr/src/app/webroot/files /usr/src/app/files_private \
+    /usr/src/app/webroot/cache /usr/src/app/webroot/js /usr/src/app/webroot/tmp \
+    && chmod -R 775 /usr/src/app/tmp /usr/src/app/logs /usr/src/app/webroot/files /usr/src/app/files_private \
+    /usr/src/app/webroot/cache /usr/src/app/webroot/js /usr/src/app/webroot/tmp \
+    # Make CakePHP script executable (may be required for restore - could possibly be removed in the future)
+    && chmod +x /usr/src/app/bin/cake
+# Set max upload, POST size and memory limit (as default values are too low)
+RUN echo "upload_max_filesize=200M" > /usr/local/etc/php/conf.d/uploads.ini \
+    && echo "post_max_size=201M" >> /usr/local/etc/php/conf.d/uploads.ini \
+    && echo "memory_limit=512M" >> /usr/local/etc/php/conf.d/uploads.ini
+# Copy custom PHP-FPM global config (global directive, overwriting defaults)
+COPY config/php-fpm.conf /usr/local/etc/php-fpm.conf
+# Copy custom PHP-FPM pool config (pool directive, overwriting defaults)
+COPY config/www.conf /usr/local/etc/php-fpm.d/www.conf
+# Add entrypoint script (gets invoked at startup of container)
+COPY entrypoints/foodcoopshop-app.sh /usr/local/bin/foodcoopshop-app-entrypoint.sh
+RUN chmod +x /usr/local/bin/foodcoopshop-app-entrypoint.sh
+# Working dir for runtime (volume)
+WORKDIR /app
+# Start entrypoint
+ENTRYPOINT ["/usr/local/bin/foodcoopshop-app-entrypoint.sh"]
+# Listen on port 9000
+EXPOSE 9000
