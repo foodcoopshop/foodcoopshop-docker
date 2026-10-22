@@ -4,11 +4,15 @@
 #   Built image is also used by the foodcoopshop-cron service
 #
 # Invoke this via
-#   docker compose -f foodcoopshop/docker-compose.yml build [--no-cache] --build-arg FCS_VERSION=<VERSION_NUMBER> foodcoopshop-app
+#   docker compose -f foodcoopshop/docker-compose.yml build [--no-cache] --pull --build-arg FCS_VERSION=<VERSION_NUMBER> foodcoopshop-app
 # or
-#   docker compose -f foodcoopshop/docker-compose.yml build [--no-cache] foodcoopshop-backup
+#   docker compose -f foodcoopshop/docker-compose.yml build [--no-cache] --pull foodcoopshop-backup
+#
+# NOTE: Always build with --pull so the latest patched PHP 8.5 base image is
+#       fetched. The base image tag below floats within 8.5 (auto patch updates),
+#       but a locally cached base image is only refreshed when --pull is used.
 # ------
-FROM php:8.4-fpm-alpine
+FROM php:8.5-fpm-alpine
 # System dependencies fuer PHP
 RUN apk add --no-cache \
     icu-libs icu-data-full libzip freetype libjpeg-turbo libpng bash unzip wget imagemagick bzip2 \
@@ -47,6 +51,8 @@ RUN chown -R application:application /usr/src/app \
 RUN echo "upload_max_filesize=200M" > /usr/local/etc/php/conf.d/uploads.ini \
     && echo "post_max_size=201M" >> /usr/local/etc/php/conf.d/uploads.ini \
     && echo "memory_limit=512M" >> /usr/local/etc/php/conf.d/uploads.ini
+# Hardening: do not disclose the PHP version via the X-Powered-By HTTP header
+RUN echo "expose_php=Off" > /usr/local/etc/php/conf.d/security.ini
 # Copy custom PHP-FPM global config (global directive, overwriting defaults)
 COPY config/php-fpm.conf /usr/local/etc/php-fpm.conf
 # Copy custom PHP-FPM pool config (pool directive, overwriting defaults)
