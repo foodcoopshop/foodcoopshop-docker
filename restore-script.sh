@@ -41,7 +41,9 @@ fi
 # 1. restore database
 echo "Restoring database from: $DB_DUMP"
 if [ $DRYRUN -eq 0 ]; then
-  zstd -dc "$DB_DUMP" | mysql -h "$DB_HOST" -u "$DB_USER" \
+  # --ssl-verify-server-cert=0: keep TLS but skip verifying the server's
+  # self-signed certificate (newer mariadb-client verifies by default)
+  zstd -dc "$DB_DUMP" | mysql --ssl-verify-server-cert=0 -h "$DB_HOST" -u "$DB_USER" \
     -p"$(cat /run/secrets/mysql_fcsdbpass)" "$DB_NAME"
 else
   echo "[DRY-RUN] -> would be imported with mysql"

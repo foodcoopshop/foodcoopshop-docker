@@ -28,10 +28,23 @@ DB_NAME="${DB_NAME:-foodcoopshop}"
 mkdir -p "$TARGET_DIR"
 log "Starting ${TYPE} backup run..."
 
-# DB dump with fast and efficient compression (zstd)
+# DB dump with fast and efficient compression (zstd).
+# Dump to a temporary file first and only compress on success: piping mysqldump
+# straight into zstd would hide mysqldump's exit status behind zstd (dash has no
+# pipefail) and leave a bogus, near-empty "successful" archive - and the rotation
+# below would then happily delete older, good backups.
+# --ssl-verify-server-cert=0 keeps the connection encrypted but skips verifying
+# the server's certificate: newer mariadb-client (>= 11.x) verifies by default
+# and otherwise fails against mysql's auto-generated self-signed certificate
+# ("TLS/SSL error: self-signed certificate in certificate chain").
 DB_FILE="${TARGET_DIR}/db_${TS}.sql.zst"
-mysqldump --no-tablespaces -h "$DB_HOST" -u "$DB_USER" \
-  -p"$(cat /run/secrets/mysql_fcsdbpass)" "$DB_NAME" | zstd -19 -T0 -o "$DB_FILE"
+DUMP_TMP="${TARGET_DIR}/.db_${TS}.sql.part"
+trap 'rm -f "$DUMP_TMP"' EXIT
+mysqldump --no-tablespaces --ssl-verify-server-cert=0 -h "$DB_HOST" -u "$DB_USER" \
+  -p"$(cat /run/secrets/mysql_fcsdbpass)" "$DB_NAME" > "$DUMP_TMP"
+zstd -19 -T0 -o "$DB_FILE" "$DUMP_TMP"
+rm -f "$DUMP_TMP"
+trap - EXIT
 log "Database dump completed: $DB_FILE"
 
 # Make archive of directories webroot/files and files_private
