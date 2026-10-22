@@ -12,7 +12,10 @@ services:
     depends_on:
       - foodcoopshop-app
     healthcheck:
-      test: ["CMD", "pgrep", "nginx"]
+      # Query the dedicated /healthcheck endpoint so the check verifies nginx is
+      # actually serving, not merely that a process exists (wget ships with the
+      # busybox in nginx:alpine)
+      test: ["CMD", "wget", "-q", "-O", "-", "http://localhost/healthcheck"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -112,6 +115,13 @@ services:
     image: foodcoopshop-backup
     container_name: foodcoopshop-backup
     restart: always
+    environment:
+      # Single source of truth for DB connection used by backup-script.sh and
+      # restore-script.sh (password is provided via the mysql_fcsdbpass secret).
+      # Set DB_HOST to the db service name (or an external host) to match your setup.
+      - DB_HOST=YOURDBHOST
+      - DB_NAME=YOURDB
+      - DB_USER=YOURDBUSER
     depends_on:
       - foodcoopshop-db #without running db container no backup
     volumes:

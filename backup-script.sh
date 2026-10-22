@@ -20,13 +20,18 @@ fi
 TS=$(date +%F_%H-%M)
 TARGET_DIR="/backups/$TYPE"
 
+# DB connection (provided via docker-compose environment; defaults as fallback)
+DB_HOST="${DB_HOST:-foodcoopshop-db}"
+DB_USER="${DB_USER:-foodcoop}"
+DB_NAME="${DB_NAME:-foodcoopshop}"
+
 mkdir -p "$TARGET_DIR"
 log "Starting ${TYPE} backup run..."
 
 # DB dump with fast and efficient compression (zstd)
 DB_FILE="${TARGET_DIR}/db_${TS}.sql.zst"
-mysqldump --no-tablespaces -h foodcoopshop-db -u foodcoop \
-  -p"$(cat /run/secrets/mysql_fcsdbpass)" foodcoopshop | zstd -19 -T0 -o "$DB_FILE"
+mysqldump --no-tablespaces -h "$DB_HOST" -u "$DB_USER" \
+  -p"$(cat /run/secrets/mysql_fcsdbpass)" "$DB_NAME" | zstd -19 -T0 -o "$DB_FILE"
 log "Database dump completed: $DB_FILE"
 
 # Make archive of directories webroot/files and files_private
