@@ -1,0 +1,12 @@
+# Keep the build context small and free of sensitive/irrelevant files.
+# Note: the Dockerfiles only COPY config/, entrypoints/ and the *.sh scripts,
+# so excluding the entries below does not affect the image build.
+.git
+.gitignore
+.dockerignore
+secrets/
+fcs_data/
+*.md
+.vscode/
+.idea/
+.DS_Store

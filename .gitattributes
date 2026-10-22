@@ -1,0 +1,7 @@
+# This repository is deployed into Linux containers. Enforce LF line endings in
+# the repository and on checkout so shell scripts and config files are never
+# broken by CRLF (dash/sh in the containers fails on CRLF scripts).
+* text=auto eol=lf
+
+# Be explicit for the files executed inside containers.
+*.sh text eol=lf
