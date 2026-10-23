@@ -14,8 +14,11 @@ services:
     healthcheck:
       # Query the dedicated /healthcheck endpoint so the check verifies nginx is
       # actually serving, not merely that a process exists (wget ships with the
-      # busybox in nginx:alpine)
-      test: ["CMD", "wget", "-q", "-O", "-", "http://localhost/healthcheck"]
+      # busybox in nginx:alpine). Use 127.0.0.1, not localhost: in the alpine
+      # container localhost resolves to IPv6 ::1, but the server listens on IPv4
+      # only (listen 80), so wget to localhost gets "Connection refused" and the
+      # check flaps to unhealthy even though nginx is serving fine.
+      test: ["CMD", "wget", "-q", "-O", "-", "http://127.0.0.1/healthcheck"]
       interval: 30s
       timeout: 10s
       retries: 3
