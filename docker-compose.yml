@@ -12,7 +12,13 @@ services:
     depends_on:
       - foodcoopshop-app
     healthcheck:
-      test: ["CMD", "pgrep", "nginx"]
+      # Query the dedicated /healthcheck endpoint so the check verifies nginx is
+      # actually serving, not merely that a process exists (wget ships with the
+      # busybox in nginx:alpine). Use 127.0.0.1, not localhost: in the alpine
+      # container localhost resolves to IPv6 ::1, but the server listens on IPv4
+      # only (listen 80), so wget to localhost gets "Connection refused" and the
+      # check flaps to unhealthy even though nginx is serving fine.
+      test: ["CMD", "wget", "-q", "-O", "-", "http://127.0.0.1/healthcheck"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -54,7 +60,12 @@ services:
       start_period: 30s
 
   foodcoopshop-db:
-    image: mysql:lts
+    # Pin to a fixed major (8.4 LTS, supported until ~2032) instead of a floating
+    # tag. `mysql:lts`/`latest` eventually jump to a new major; MySQL forbids a
+    # cross-major in-place DOWNGRADE, so the server then refuses to open its
+    # existing data directory and crash-loops. Bump this deliberately and migrate
+    # the data (logical dump + fresh volume) rather than letting the tag float.
+    image: mysql:8.4
     container_name: foodcoopshop-db
     restart: unless-stopped
     environment:
@@ -112,6 +123,13 @@ services:
     image: foodcoopshop-backup
     container_name: foodcoopshop-backup
     restart: always
+    environment:
+      # Single source of truth for DB connection used by backup-script.sh and
+      # restore-script.sh (password is provided via the mysql_fcsdbpass secret).
+      # Set DB_HOST to the db service name (or an external host) to match your setup.
+      - DB_HOST=YOURDBHOST
+      - DB_NAME=YOURDB
+      - DB_USER=YOURDBUSER
     depends_on:
       - foodcoopshop-db #without running db container no backup
     volumes:

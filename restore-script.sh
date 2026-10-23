@@ -2,7 +2,7 @@
 set -e
 
 # Call this script manually as follows:
-# docker exec -it foodcoopshop-backup sh /backup/restore-script.sh \
+# docker exec -it foodcoopshop-backup sh /restore-script.sh \
 #  [--dry-run] /backups/daily/db_2025-10-03_02-00.sql.zst \
 #              /backups/daily/files_2025-10-03_02-00.tar.zst
 
@@ -11,6 +11,11 @@ if [ "$1" = "--dry-run" ]; then
   DRYRUN=1
   shift
 fi
+
+# DB connection (provided via docker-compose environment; defaults as fallback)
+DB_HOST="${DB_HOST:-foodcoopshop-db}"
+DB_USER="${DB_USER:-foodcoop}"
+DB_NAME="${DB_NAME:-foodcoopshop}"
 
 DB_DUMP=$1
 FILES_ARCHIVE=$2
@@ -36,8 +41,10 @@ fi
 # 1. restore database
 echo "Restoring database from: $DB_DUMP"
 if [ $DRYRUN -eq 0 ]; then
-  zstd -dc "$DB_DUMP" | mysql -h YOURDBHOST -u YOURDBUSER \
-    -p"$(cat /run/secrets/mysql_fcsdbpass)" YOURDB
+  # --ssl-verify-server-cert=0: keep TLS but skip verifying the server's
+  # self-signed certificate (newer mariadb-client verifies by default)
+  zstd -dc "$DB_DUMP" | mysql --ssl-verify-server-cert=0 -h "$DB_HOST" -u "$DB_USER" \
+    -p"$(cat /run/secrets/mysql_fcsdbpass)" "$DB_NAME"
 else
   echo "[DRY-RUN] -> would be imported with mysql"
 fi

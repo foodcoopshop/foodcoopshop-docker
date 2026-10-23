@@ -1,0 +1,11 @@
+# Real Docker secret values – copy the *.txt.example templates to *.txt and fill them in.
+# The templates stay versioned; the filled-in secrets must never be committed.
+secrets/*.txt
+
+# Local runtime data (user uploads, private files, DB data, local backups)
+fcs_data/
+
+# Editor / OS cruft
+.vscode/
+.idea/
+.DS_Store

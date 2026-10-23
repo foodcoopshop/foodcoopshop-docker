@@ -5,7 +5,7 @@
 ##  docker compose -f docker-compose.yml build --no-cache foodcoopshop-backup
 ##  docker compose -f docker-compose.yml up -d foodcoopshop-backup
 
-FROM debian:bookworm-slim
+FROM debian:trixie-slim
 
 # Install system dependencies for backup task 
 RUN apt-get update \
